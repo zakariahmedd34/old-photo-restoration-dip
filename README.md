@@ -37,35 +37,6 @@ old-photo-restoration-dip/
 └── outputs/                 # Restored images saved here
 ```
 
----
-
-## Installation
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## Usage
-
-```bash
-python main.py
-```
-
----
-
-## Requirements
-
-- Python 3.8+
-- opencv-python
-- numpy
-- Pillow
-- scikit-image
-- matplotlib
-
----
-
 ## Course
 
 CSCI 451 — Digital Image Processing
