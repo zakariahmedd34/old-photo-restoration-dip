@@ -1,68 +1,65 @@
 import cv2
 import numpy as np
-import pywt
 
 
 class Denoiser:
     """
-    Advanced denoiser for old photo restoration.
+    Denoising module for old photo restoration.
 
-    Supports:
-    - spatial methods (median, bilateral, non-local means)
-    - frequency method (wavelet denoising)
+    Methods:
+    - Median filter
+    - Non-local means
+    - Bilateral filter
+    - Frequency-domain low-pass filter
     """
 
     def __init__(
         self,
-        method="nlm",
-        median_ksize=3,
+        median_kernel=5,
         nlm_h=10,
         nlm_template=7,
         nlm_search=21,
         bilateral_d=9,
         bilateral_sigma_color=75,
         bilateral_sigma_space=75,
-        wavelet="db1",
-        wavelet_level=2,
-        wavelet_thresh=20,
+        freq_radius=30,
         verbose=True,
     ):
-        self.method = method
-        self.median_ksize = median_ksize
+
+        self.median_kernel = median_kernel
+
         self.nlm_h = nlm_h
         self.nlm_template = nlm_template
         self.nlm_search = nlm_search
+
         self.bilateral_d = bilateral_d
         self.bilateral_sigma_color = bilateral_sigma_color
         self.bilateral_sigma_space = bilateral_sigma_space
-        self.wavelet = wavelet
-        self.wavelet_level = wavelet_level
-        self.wavelet_thresh = wavelet_thresh
+
+        self.freq_radius = freq_radius
+
         self.verbose = verbose
 
-    # -------------------------
-    # INTERNAL HELPERS
-    # -------------------------
+    def median_filter(self, image):
 
-    def _validate_image(self, image):
-        """
-        Ensure image is valid.
-        """
-        if image is None:
-            raise ValueError("Input image is None.")
+        return cv2.medianBlur(
+            image,
+            self.median_kernel
+        )
 
-    # -------------------------
-    # CORE METHODS
-    # -------------------------
+    def nlm_filter(self, image):
 
-    def _median(self, image):
-        if self.verbose:
-            print("Applying Median Filter")
-        return cv2.medianBlur(image, self.median_ksize)
+        return cv2.fastNlMeansDenoisingColored(
+            image,
+            None,
+            self.nlm_h,
+            self.nlm_h,
+            self.nlm_template,
+            self.nlm_search,
+        )
 
-    def _bilateral(self, image):
-        if self.verbose:
-            print("Applying Bilateral Filter")
+    def bilateral_filter(self, image):
+
         return cv2.bilateralFilter(
             image,
             self.bilateral_d,
@@ -70,118 +67,86 @@ class Denoiser:
             self.bilateral_sigma_space,
         )
 
-    def _nlm(self, image):
-        if self.verbose:
-            print("Applying Non-Local Means")
+    def frequency_filter(self, image):
+        """
+        Frequency-domain low-pass filtering using FFT.
+        """
 
-        if len(image.shape) == 2:
-            return cv2.fastNlMeansDenoising(
-                image,
-                None,
-                self.nlm_h,
-                self.nlm_template,
-                self.nlm_search,
-            )
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         else:
-            return cv2.fastNlMeansDenoisingColored(
-                image,
-                None,
-                self.nlm_h,
-                self.nlm_h,
-                self.nlm_template,
-                self.nlm_search,
-            )
+            gray = image.copy()
 
-    def _wavelet_denoise(self, image):
-        if self.verbose:
-            print("Applying Wavelet Denoising")
+        # FFT
+        f = np.fft.fft2(gray)
+        fshift = np.fft.fftshift(f)
 
-        img = np.float32(image) / 255.0
+        rows, cols = gray.shape
+        crow, ccol = rows // 2, cols // 2
 
-        if len(img.shape) == 3:
-            channels = cv2.split(img)
-            denoised_channels = [
-                self._wavelet_channel(c) for c in channels
-            ]
-            result = cv2.merge(denoised_channels)
-        else:
-            result = self._wavelet_channel(img)
+        # Circular low-pass mask
+        mask = np.zeros((rows, cols), np.uint8)
 
-        result = np.clip(result * 255, 0, 255).astype(np.uint8)
-        return result
+        cv2.circle(
+            mask,
+            (ccol, crow),
+            self.freq_radius,
+            1,
+            -1
+        )
 
-    def _wavelet_channel(self, channel):
-        coeffs = pywt.wavedec2(channel, self.wavelet, level=self.wavelet_level)
+        # Apply mask
+        fshift_filtered = fshift * mask
 
-        new_coeffs = [coeffs[0]]
+        # Inverse FFT
+        ishift = np.fft.ifftshift(fshift_filtered)
+        img_back = np.fft.ifft2(ishift)
+        img_back = np.abs(img_back)
 
-        for detail_level in coeffs[1:]:
-            new_level = []
-            for arr in detail_level:
-                arr = pywt.threshold(
-                    arr,
-                    self.wavelet_thresh,
-                    mode="soft"
-                )
-                new_level.append(arr)
-            new_coeffs.append(tuple(new_level))
+        img_back = np.clip(img_back, 0, 255).astype(np.uint8)
 
-        return pywt.waverec2(new_coeffs, self.wavelet)
+        # Convert back to BGR for visualization consistency
+        freq_bgr = cv2.cvtColor(
+            img_back,
+            cv2.COLOR_GRAY2BGR
+        )
 
-    # -------------------------
-    # PUBLIC API
-    # -------------------------
+        return freq_bgr
 
-    def apply(self, image):
+    def process_image(self, image):
         """
-        Apply selected denoising method.
+        Apply all denoising methods to one image.
         """
-        self._validate_image(image)
 
-        if self.method == "median":
-            return self._median(image)
+        median = self.median_filter(image)
 
-        elif self.method == "bilateral":
-            return self._bilateral(image)
+        nlm = self.nlm_filter(image)
 
-        elif self.method == "nlm":
-            return self._nlm(image)
+        bilateral = self.bilateral_filter(image)
 
-        elif self.method == "wavelet":
-            return self._wavelet_denoise(image)
+        frequency = self.frequency_filter(image)
 
-        else:
-            raise ValueError(f"Unknown method: {self.method}")
+        return {
+            "median": median,
+            "nlm": nlm,
+            "bilateral": bilateral,
+            "frequency": frequency,
+        }
 
-    def apply_batch(self, images):
+    def process_batch(self, images):
         """
-        Apply denoising to multiple images.
+        Apply denoising methods to all images.
         """
+
         results = []
 
         for i, image in enumerate(images):
-            if self.verbose:
-                print(f"\nImage {i+1} — Denoising")
 
-            result = self.apply(image)
-            results.append(result)
+            if self.verbose:
+                print(f"Processing image {i+1}")
+
+            outputs = self.process_image(image)
+
+            results.append(outputs)
 
         return results
-
-    # -------------------------
-    # COMPARISON (NOTEBOOK)
-    # -------------------------
-
-    def compare_methods(self, image):
-        """
-        Return all methods for visual comparison.
-        """
-        self._validate_image(image)
-
-        return {
-            "original": image,
-            "median": self._median(image),
-            "bilateral": self._bilateral(image),
-            "nlm": self._nlm(image),
-            "wavelet": self._wavelet_denoise(image),
-        }
