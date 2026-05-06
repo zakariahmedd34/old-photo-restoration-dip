@@ -40,12 +40,20 @@ class Denoiser:
 
         self.verbose = verbose
 
+    # ======================================================
+    # Median Filter
+    # ======================================================
+
     def median_filter(self, image):
 
         return cv2.medianBlur(
             image,
             self.median_kernel
         )
+
+    # ======================================================
+    # Non-Local Means
+    # ======================================================
 
     def nlm_filter(self, image):
 
@@ -58,6 +66,10 @@ class Denoiser:
             self.nlm_search,
         )
 
+    # ======================================================
+    # Bilateral Filter
+    # ======================================================
+
     def bilateral_filter(self, image):
 
         return cv2.bilateralFilter(
@@ -67,24 +79,24 @@ class Denoiser:
             self.bilateral_sigma_space,
         )
 
-    def frequency_filter(self, image):
+    # ======================================================
+    # Frequency-Domain Low-Pass Filter
+    # ======================================================
+
+    def low_pass_channel(self, channel):
         """
-        Frequency-domain low-pass filtering using FFT.
+        Apply low-pass filtering to one channel.
         """
 
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image.copy()
+        f = np.fft.fft2(channel)
 
-        # FFT
-        f = np.fft.fft2(gray)
         fshift = np.fft.fftshift(f)
 
-        rows, cols = gray.shape
+        rows, cols = channel.shape
+
         crow, ccol = rows // 2, cols // 2
 
-        # Circular low-pass mask
+        # Circular mask
         mask = np.zeros((rows, cols), np.uint8)
 
         cv2.circle(
@@ -96,47 +108,75 @@ class Denoiser:
         )
 
         # Apply mask
-        fshift_filtered = fshift * mask
+        filtered = fshift * mask
 
         # Inverse FFT
-        ishift = np.fft.ifftshift(fshift_filtered)
+        ishift = np.fft.ifftshift(filtered)
+
         img_back = np.fft.ifft2(ishift)
+
         img_back = np.abs(img_back)
 
-        img_back = np.clip(img_back, 0, 255).astype(np.uint8)
-
-        # Convert back to BGR for visualization consistency
-        freq_bgr = cv2.cvtColor(
+        img_back = np.clip(
             img_back,
-            cv2.COLOR_GRAY2BGR
+            0,
+            255
+        ).astype(np.uint8)
+
+        return img_back
+
+    def frequency_filter(self, image):
+        """
+        Apply frequency-domain filtering
+        separately to B, G, R channels.
+        """
+
+        if len(image.shape) == 2:
+            return self.low_pass_channel(image)
+
+        # Split BGR channels
+        b, g, r = cv2.split(image)
+
+        # Filter each channel
+        b_filtered = self.low_pass_channel(b)
+
+        g_filtered = self.low_pass_channel(g)
+
+        r_filtered = self.low_pass_channel(r)
+
+        # Merge back
+        merged = cv2.merge(
+            [b_filtered, g_filtered, r_filtered]
         )
 
-        return freq_bgr
+        return merged
+
+    # ======================================================
+    # Process Single Image
+    # ======================================================
 
     def process_image(self, image):
-        """
-        Apply all denoising methods to one image.
-        """
 
         median = self.median_filter(image)
-
-        nlm = self.nlm_filter(image)
 
         bilateral = self.bilateral_filter(image)
 
         frequency = self.frequency_filter(image)
 
+        nlm = self.nlm_filter(image)
+
         return {
             "median": median,
-            "nlm": nlm,
             "bilateral": bilateral,
             "frequency": frequency,
+            "nlm": nlm,
         }
 
+    # ======================================================
+    # Batch Processing
+    # ======================================================
+
     def process_batch(self, images):
-        """
-        Apply denoising methods to all images.
-        """
 
         results = []
 
