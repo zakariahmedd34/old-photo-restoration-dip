@@ -46,7 +46,7 @@ def color_correction(image):
     return cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
 
 # Example Usage
-img = cv2.imread('input_image.jpg')
+img = cv2.imread('assets\gallery_originals\img1.jpg')
 if detect_sepia(img):
     print("Sepia detected.")
     
@@ -54,3 +54,37 @@ cleaned = grayscale_cleanup(img)
 corrected = color_correction(img)
 
 cv2.imwrite('corrected_output.jpg', corrected)
+
+
+
+#testing the functions
+def test_pipeline():
+    print("Starting automated tests...")
+    
+    # Test Sepia Detection
+    sepia_sample = np.full((100, 100, 3), (110, 150, 220), dtype=np.uint8)
+    assert detect_sepia(sepia_sample) == True, "Sepia detection failed!"
+
+    # Test Grayscale Cleanup
+    low_contrast = np.full((100, 100, 3), 120, dtype=np.uint8)
+    low_contrast[0,0] = 125 
+    cleaned = grayscale_cleanup(low_contrast)
+    assert np.std(cleaned) >= np.std(low_contrast), "Cleanup did not improve contrast"
+
+    # Test Color Correction
+    tinted = np.zeros((100, 100, 3), dtype=np.uint8)
+    tinted[:,:,0] = 200 
+    corrected = color_correction(tinted)
+    assert np.mean(corrected[:,:,0]) < 200, "Color correction failed to reduce tint"
+
+    print("✅ All internal tests passed!")
+
+# --- 3. Execution Logic ---
+
+if __name__ == "__main__":
+    # Running the automated tests first
+    test_pipeline()
+    
+    # After tests pass, you can process your actual 10 images
+    # img = cv2.imread('your_image.jpg')
+    # ... process and save results ...
