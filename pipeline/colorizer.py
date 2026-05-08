@@ -1,15 +1,13 @@
-class Colorizer:
-    pass
 
 import cv2
 import numpy as np
 
 def detect_sepia(image):
     """
-    Detects if an image is sepia by checking if the R and G channels 
+    checking if the R and G channels 
     are significantly higher than the B channel in a specific ratio.
     """
-    # Convert to YCrCb to analyze chromaticity
+    # analyze chromaticity
     ycrcb = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb)
     avg_cr = np.mean(ycrcb[:, :, 1])
     avg_cb = np.mean(ycrcb[:, :, 2])
@@ -19,12 +17,17 @@ def detect_sepia(image):
         return True
     return False
 
+
+
 def grayscale_cleanup(image):
     """
     Enhances grayscale images using Histogram Equalization 
     to improve contrast and remove 'muddiness'.
     """
+
+
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
     # CLAHE (Contrast Limited Adaptive Histogram Equalization) for better cleanup
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     cleaned = clahe.apply(gray)
@@ -35,6 +38,7 @@ def color_correction(image):
     Applies Simple White Balance (Gray World Hypothesis) 
     to correct color casts.
     """
+
     result = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
     avg_a = np.average(result[:, :, 1])
     avg_b = np.average(result[:, :, 2])
@@ -79,12 +83,7 @@ def test_pipeline():
 
     print("✅ All internal tests passed!")
 
-# --- 3. Execution Logic ---
 
 if __name__ == "__main__":
     # Running the automated tests first
     test_pipeline()
-    
-    # After tests pass, you can process your actual 10 images
-    # img = cv2.imread('your_image.jpg')
-    # ... process and save results ...
