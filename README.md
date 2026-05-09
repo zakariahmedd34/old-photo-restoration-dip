@@ -133,9 +133,3 @@ Install with:
 ```bash
 pip install -r requirements.txt
 ```
-
----
-
-## Course
-
-Digital Image Processing — University Project
