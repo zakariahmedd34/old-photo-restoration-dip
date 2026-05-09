@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Old Photo Restoration</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <div class="page-wrapper">
+
+    <!-- ── Header ──────────────────────────────────────────────── -->
+    <header class="site-header">
+      <div class="header-badge">
+        <span class="dot"></span> DIP Course Project
+      </div>
+      <h1>Old Photo Restoration</h1>
+      <p class="subtitle">Rescue damaged photographs with a five-stage image-processing pipeline</p>
+      <div class="header-line">
+        <span></span><i>✦</i><span></span>
+      </div>
+    </header>
+
+    <main class="container">
+
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <ul class="flash-list">
+            {% for msg in messages %}
+              <li class="flash-msg">⚠️ {{ msg }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      <!-- ── Upload card ──────────────────────────────────────── -->
+      <section class="card upload-card">
+        <p class="card-heading">Upload a Damaged Photo</p>
+        <p class="card-hint">Drop your old photograph below and the pipeline will repair it automatically.</p>
+
+        <form id="upload-form" action="/restore" method="post" enctype="multipart/form-data">
+
+          <label class="drop-zone" id="drop-zone" for="image-input">
+            <div class="drop-icon-wrap">🖼️</div>
+            <span class="drop-primary" id="drop-text">Click to select or drag &amp; drop</span>
+            <span class="drop-secondary">Supports JPG, PNG, TIFF</span>
+            <div class="drop-formats">
+              <span class="format-pill">JPG</span>
+              <span class="format-pill">JPEG</span>
+              <span class="format-pill">PNG</span>
+              <span class="format-pill">TIF</span>
+              <span class="format-pill">TIFF</span>
+            </div>
+            <input type="file" id="image-input" name="image"
+                   accept=".jpg,.jpeg,.png,.tif,.tiff" required />
+          </label>
+
+          <!-- Thumbnail preview -->
+          <div id="preview-wrap" class="preview-wrap hidden">
+            <img id="preview-img" src="#" alt="Preview" />
+            <div class="preview-info">
+              <span class="preview-name" id="preview-name"></span>
+              <span class="preview-ready">✔ Ready to restore</span>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-restore" id="submit-btn">
+            ✨ Restore Photo
+          </button>
+        </form>
+      </section>
+
+      <!-- ── Pipeline stages ─────────────────────────────────── -->
+      <section class="card">
+        <p class="card-heading">Five-Stage Pipeline</p>
+        <p class="card-hint">Every image passes through these stages in order.</p>
+
+        <div class="stages-grid">
+          <div class="stage-item">
+            <div class="stage-num">01</div>
+            <div class="stage-title">Denoising</div>
+            <div class="stage-desc">Non-Local Means removes film grain and sensor noise.</div>
+          </div>
+          <div class="stage-item">
+            <div class="stage-num">02</div>
+            <div class="stage-title">Scratch Detection</div>
+            <div class="stage-desc">Morphological top-hat at H, V, and diagonal orientations with aspect-ratio and density filtering.</div>
+          </div>
+          <div class="stage-item">
+            <div class="stage-num">03</div>
+            <div class="stage-title">Inpainting</div>
+            <div class="stage-desc">Navier-Stokes fills in detected damage, then a light NLM pass blends the seams.</div>
+          </div>
+          <div class="stage-item">
+            <div class="stage-num">04</div>
+            <div class="stage-title">Enhancement</div>
+            <div class="stage-desc">CLAHE (clip 2.0, tile 8×8) boosts local contrast without over-exposing bright areas.</div>
+          </div>
+          <div class="stage-item">
+            <div class="stage-num">05</div>
+            <div class="stage-title">Color Correction</div>
+            <div class="stage-desc">Auto-detects sepia, grayscale, or color and applies the right fix.</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <p>DIP Course Project &mdash; Old Photo Restoration &mdash; 2026</p>
+    </footer>
+  </div>
+
+  <script>
+    const input    = document.getElementById("image-input");
+    const dropZone = document.getElementById("drop-zone");
+    const dropText = document.getElementById("drop-text");
+    const preview  = document.getElementById("preview-img");
+    const prevWrap = document.getElementById("preview-wrap");
+    const prevName = document.getElementById("preview-name");
+    const form     = document.getElementById("upload-form");
+    const submitBtn = document.getElementById("submit-btn");
+
+    function showPreview(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        preview.src = e.target.result;
+        prevName.textContent = file.name;
+        prevWrap.classList.remove("hidden");
+        dropText.textContent = "Change image";
+      };
+      reader.readAsDataURL(file);
+    }
+
+    input.addEventListener("change", () => showPreview(input.files[0]));
+
+    // Drag-and-drop
+    dropZone.addEventListener("dragover",  e => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault();
+      dropZone.classList.remove("drag-over");
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        showPreview(file);
+      }
+    });
+
+    // Loading state
+    form.addEventListener("submit", () => {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Processing…';
+    });
+  </script>
+</body>
+</html>
